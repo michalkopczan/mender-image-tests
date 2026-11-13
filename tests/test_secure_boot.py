@@ -13,18 +13,7 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os
-import platform
-
 import pytest
-
-
-def is_legacy_host():
-    # The host running the tests: bookworm/jammy ship the 2M OVMF, which has
-    # Secure Boot compiled in and always reports a state. Newer debianoids ship
-    # only the 4M OVMF (see tests/uefi-nvram/README.md).
-    codename = platform.freedesktop_os_release().get("VERSION_CODENAME")
-    return codename in ("bookworm", "jammy")
 
 
 @pytest.mark.only_with_image("uefiimg")
@@ -34,19 +23,6 @@ class TestSecureBoot:
     def test_secure_boot_enabled(self, connection, conversion, bitbake_variables):
         if not conversion:
             pytest.skip("MEN-5253: Secure Boot not yet working for Yocto")
-
-        # On modern (4M OVMF) hosts, images booted with Secure Boot off
-        # (QEMU_NO_SECURE_BOOT=1) run on the plain, non-SB OVMF_CODE_4M.fd, which
-        # exposes no SecureBoot state for mokutil to read -- so there is nothing
-        # to assert. The firmware-choice comment in scripts/test/mender-convert-qemu
-        # explains why (Ubuntu cannot boot the SMM/q35 .secboot firmware). The
-        # legacy 2M firmware always reports a state, so the no-grub.d "disabled"
-        # check below still runs on bookworm/jammy.
-        if not is_legacy_host() and os.environ.get("QEMU_NO_SECURE_BOOT") == "1":
-            pytest.skip(
-                "Secure Boot disabled on a modern host; the non-SB OVMF cannot "
-                "report Secure Boot state"
-            )
 
         output = connection.run("mokutil --sb-state").stdout.strip()
 
